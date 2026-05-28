@@ -14,8 +14,8 @@
           ($formatted))
 
 ; get day of the week
-!(let* (($christmas-ts 1766188800)
-              ($dow (day-of-week $christmas-ts)))
+!(let* (($ts 1766188800)
+              ($dow (day-of-week $ts)))
           ($dow))
 
 ; diff between two timestamps
