@@ -362,7 +362,7 @@ typed_functioncall_branch(Fun, TypeChain, T, GsH, IsPartial, Bound, Out, BranchG
 %Selectively apply translate_args for non-Expression args while Expression args stay as data input:
 translate_args_by_type([], _, [], []) :- !.
 translate_args_by_type([A|As], [T|Ts], GsOut, [AV|AVs]) :-
-                      ( T == 'Expression' -> AV = A, GsA = []
+                      ( (T == 'Expression'; T == 'Atom') -> AV = A, GsA = []
                                            ; translate_expr(A, GsA1, AV),
                                              ( (T == '%Undefined%' ; T == 'Atom')
                                                -> GsA = GsA1
