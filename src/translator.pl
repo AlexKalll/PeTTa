@@ -75,6 +75,8 @@ rewrite_streamops(['trace!', Arg1, Arg2],
                   [progn, ['println!', Arg1], Arg2]).
 rewrite_streamops([unique, Arg],
                   [call, [superpose, ['unique-atom', [collapse, Arg]]]]).
+rewrite_streamops(['alpha-unique', Arg],
+                  [call, [superpose, ['alpha-unique-atom', [collapse, Arg]]]]).
 rewrite_streamops([union, [superpose|A], [superpose|B]],
                   [call, [superpose, ['union-atom', [collapse, [superpose|A]],
                                                     [collapse, [superpose|B]]]]]).
@@ -172,6 +174,13 @@ translate_expr([H0|T0], Goals, Out) :-
                                                      ; translate_expr(KeyExpr, Gk, Kv),
                                                        translate_case(PairsExpr, Kv, Out, IfGoal, KeyGoal),
                                                        append([GsH, Gk, KeyGoal, [IfGoal]], Goals) )
+        %--- Short-circuit boolean operators ---:
+        ; HV == 'and-then', T = [A, B] -> translate_expr_to_conj(A, ConjA, Av),
+                                           translate_expr_to_conj(B, ConjB, Bv),
+                                           append(GsH, [(ConjA, (Av == true -> (ConjB, Out = Bv) ; Out = false))], Goals)
+        ; HV == 'or-else', T = [A, B] -> translate_expr_to_conj(A, ConjA, Av),
+                                          translate_expr_to_conj(B, ConjB, Bv),
+                                          append(GsH, [(ConjA, (Av == true -> Out = true ; (ConjB, Out = Bv)))], Goals)
         %--- Unification constructs ---:
         ; (HV == let ; HV == chain), T = [Pat, Val, In] -> translate_expr(Pat, Gp, Pv),
                                                            translate_expr(Val, Gv, V),
