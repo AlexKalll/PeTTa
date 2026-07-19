@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PeTTa Library Development Guide</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/dracula.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css">
+<style>
+:root {
+  --r-main-font: 'Fira Code', 'Cascadia Code', monospace;
+  --r-heading-font: 'Fira Code', monospace;
+  --r-code-font: 'Fira Code', monospace;
+}
+.reveal { font-size: 26px; }
+.reveal pre { width: 100%; margin: 0.5em 0; font-size: 0.6em; line-height: 1.3; }
+.reveal pre code { max-height: none; padding: 0.6em; border-radius: 8px; }
+.reveal code { background: rgba(255,255,255,0.08); padding: 0.1em 0.3em; border-radius: 4px; }
+.reveal h1 { font-size: 1.8em; }
+.reveal h2 { font-size: 1.3em; color: #8be9fd; }
+.reveal h3 { font-size: 1em; color: #f1fa8c; }
+.reveal ul, .reveal ol { display: block; }
+.reveal li { margin: 0.2em 0; }
+.reveal .slides section { padding: 0.2em; }
+.slide-title { color: #ff79c6; font-size: 1.5em; }
+.subtitle { color: #6272a4; font-size: 0.8em; margin-top: -0.5em; }
+.architecture-box { background: rgba(139,233,253,0.1); border: 1px solid #8be9fd; padding: 0.4em 0.6em; margin: 0.3em 0; border-radius: 6px; }
+.architecture-arrow { color: #ffb86c; font-size: 0.8em; text-align: center; }
+.key-concept { color: #ff79c6; font-weight: bold; }
+.highlight-green { color: #50fa7b; }
+.highlight-yellow { color: #f1fa8c; }
+.highlight-orange { color: #ffb86c; }
+.highlight-pink { color: #ff79c6; }
+.highlight-blue { color: #8be9fd; }
+.small-text { font-size: 0.6em; }
+.cols { display: flex; gap: 1em; justify-content: center; }
+.col { flex: 1; }
+table { font-size: 0.65em; width: 100%; }
+td, th { padding: 0.3em; border: 1px solid #6272a4; }
+.badge { background: #6272a4; color: #f8f8f2; padding: 0.1em 0.4em; border-radius: 4px; font-size: 0.5em; vertical-align: middle; }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+<!-- ============================================================ -->
+<!-- SLIDE 1: TITLE -->
+<section>
+  <h1 class="slide-title">PeTTa Library<br>Development Guide</h1>
+  <p class="subtitle">How to Build, Integrate, and Extend PeTTa Libraries</p>
+  <p style="margin-top: 2em; font-size: 0.7em; color: #6272a4;">A Training for New Contributors</p>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 2: What is PeTTa -->
+<section>
+  <h2>What is PeTTa?</h2>
+  <div class="architecture-box">
+    <p><span class="highlight-pink">PeTTa</span> = Efficient <span class="highlight-blue">MeTTa</span> language implementation in <span class="highlight-green">SWI-Prolog</span></p>
+  </div>
+  <ul style="font-size: 0.7em;">
+    <li>MeTTa is an <span class="highlight-yellow">S-expression-based</span> AI/reasoning language (like Lisp)</li>
+    <li>PeTTa <span class="highlight-pink">compiles</span> MeTTa directly into Prolog clauses</li>
+    <li>Runs at <span class="highlight-green">near-native Prolog speed</span></li>
+    <li>Supports: NARS, PLN reasoning, atom spaces, Python interop</li>
+  </ul>
+  <pre><code class="language-bash" data-trim>
+    # Run a MeTTa file
+    time sh run.sh ./examples/nars_tuffy.metta
+  </code></pre>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 3: Architecture Overview -->
+<section>
+  <h2>Architecture Overview</h2>
+  <div style="font-size: 0.55em;">
+    <div class="architecture-box">📄 MeTTa Source (<code>.metta</code> files)</div>
+    <div class="architecture-arrow">▼</div>
+    <div class="architecture-box" style="border-color: #f1fa8c;">Parser <code>parser.pl</code><br><span class="small-text">S-Expression → Prolog Term (list)</span></div>
+    <div class="architecture-arrow">▼</div>
+    <div class="architecture-box" style="border-color: #ff79c6;">Translator <code>translator.pl</code><br><span class="small-text">MeTTa AST → Prolog Goals + Clauses</span></div>
+    <div class="architecture-arrow">▼</div>
+    <div class="architecture-box" style="border-color: #50fa7b;">Runtime <code>metta.pl</code><br><span class="small-text">Built-ins · Spaces · Eval · Import · Python</span></div>
+    <div class="architecture-arrow">▼</div>
+    <div class="architecture-box" style="border-color: #8be9fd;">⚡ SWI-Prolog Engine ⚡</div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 4: Key Source Files -->
+<section>
+  <h2>Key Source Files</h2>
+  <table>
+    <tr><th>File</th><th>Purpose</th></tr>
+    <tr><td><code>src/metta.pl</code></td><td>Core runtime: built-ins, spaces, eval, import, types</td></tr>
+    <tr><td><code>src/translator.pl</code></td><td>MeTTa → Prolog translation engine</td></tr>
+    <tr><td><code>src/parser.pl</code></td><td>S-expression parser + serializer</td></tr>
+    <tr><td><code>src/spaces.pl</code></td><td>Atom space: add, remove, match, get-atoms</td></tr>
+    <tr><td><code>src/specializer.pl</code></td><td>Higher-order function specialization</td></tr>
+    <tr><td><code>src/filereader.pl</code></td><td>File reading + two-pass compilation</td></tr>
+    <tr><td><code>src/main.pl</code></td><td>Entry point: CLI runner</td></tr>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<!-- PROLOG CRASH COURSE: SLIDE 5.1 — Facts, Rules, Predicates -->
+<section>
+  <section>
+    <h2>Prolog Crash Course (1/10)</h2>
+    <h3>Facts, Rules, and Predicates</h3>
+    <p style="font-size: 0.6em;">Prolog programs = statements of truth, not instructions. No loops, no if-else — just <span class="highlight-yellow">what is true</span>.</p>
+    <pre style="font-size: 0.5em;"><code class="language-prolog" data-trim>
+      % A FACT is always true — like a row in a database table
+      parent(john, mary).      % Always, unconditionally true
+
+      % A RULE is conditionally true — :- means "IF"
+      grandparent(X, Y) :-
+          parent(X, Z),        % IF X is parent of Z
+          parent(Z, Y).        % AND Z is parent of Y
+
+      % A QUERY asks for solutions
+      % ?- grandparent(john, X).
+      % → X = ann
+    </code></pre>
+    <p style="font-size: 0.55em;">A <span class="highlight-pink">predicate</span> = name + arity (# of args): <code>parent/2</code> and <code>parent/3</code> are completely different predicates!</p>
+  </section>
+  <section>
+    <h3>How PeTTa Uses This</h3>
+    <div style="font-size: 0.55em;">
+      <p class="highlight-orange">Atom spaces ARE Prolog predicates:</p>
+      <pre><code class="language-plaintext" data-trim>
+        MeTTa:  (parent Alice Bob)
+        Space:  '&self'(parent, alice, bob).
+        % This is a FACT! Stored with assertz.
+      </code></pre>
+      <pre><code class="language-plaintext" data-trim>
+        MeTTa:  (match &self (parent $who Bob) $who)
+        % Translates to Prolog QUERY:
+        % ?- '&self'(parent, who, bob).
+        % → who = alice
+      </code></pre>
+      <p class="highlight-pink">Function registration uses arity:</p>
+      <pre><code class="language-prolog" data-trim>
+        register_fun(myfunc),                % Marks myfunc as callable
+        assertz(arity(myfunc, 3)).            % myfunc/3 (2 inputs + output)
+        % The translator checks this to generate the right call!
+      </code></pre>
+      <p>The translator internally uses <code>current_predicate(Fun/Arity)</code> to decide if it can call a function directly at compile time or needs runtime dispatch. Arity is how Prolog distinguishes different overloads — a function with 2 args is a completely separate thing from one with 3.</p>
+    </div>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- PROLOG CRASH COURSE: SLIDE 5.2 — Unification (=) -->
+<section>
+  <section>
+    <h2>Prolog Crash Course (2/10)</h2>
+    <h3>Unification (=)</h3>
+    <p style="font-size: 0.6em;">Unification is <span class="highlight-pink">NOT assignment</span>. It's a bidirectional constraint that makes both sides identical.</p>
+    <pre style="font-size: 0.5em;"><code class="language-prolog" data-trim>
+      % If X is unbound: X = hello  →  X is now bound to hello
+      % If X is already 3: X = 5  →  FAILS (3 ≠ 5)
+      % This is NOT "x = 5" in Python — there's no overwriting!
+
+      [H|T] = [a, b, c].
+      % H = a, T = [b, c]  — destructures AND constructs
+
+      3 = X + 1.
+      % FAILS! Unification is SYNTACTIC, not arithmetic.
+      % It tries to make 3 identical to +(X, 1), which is impossible.
+    </code></pre>
+    <p style="font-size: 0.55em;">Think of it like Python's structural pattern matching: <code>match [a, b, c]: case [first, *rest]: ...</code></p>
+  </section>
+  <section>
+    <h3>How PeTTa Uses Unification</h3>
+    <div style="font-size: 0.55em;">
+      <p class="highlight-orange" style="font-weight: bold;">1. Pattern matching in spaces:</p>
+      <pre><code class="language-plaintext" data-trim>
+        (match &self (parent $who Bob) $who)
+        % $who unifies with each first argument of parent/2 facts
+        % Unification finds all bindings that make it true
+      </code></pre>
+      <p class="highlight-orange" style="font-weight: bold;">2. Let bindings:</p>
+      <pre><code class="language-plaintext" data-trim>
+        (let $x (+ 1 2) (+ $x 1))
+        % Translates to: X = 3, then Out is X + 1
+        % $x unifies with 3 via the = operator
+      </code></pre>
+      <p class="highlight-orange" style="font-weight: bold;">3. The translator itself:</p>
+      <pre><code class="language-prolog" data-trim>
+        % translate_clause uses unification to destructure:
+        Input = [=, [F|Args0], BodyExpr]
+        % This unifies F with the function name,
+        % Args0 with the argument list,
+        % BodyExpr with the body — all in one step!
+      </code></pre>
+      <p class="highlight-pink">Key insight:</p>
+      <p>In PeTTa's translator, unification is the primary tool — pattern matching MeTTa ASTs, extracting function names and args, binding variables. The entire <code>translate_expr</code> pipeline is driven by unification, not function calls.</p>
+    </div>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- PROLOG CRASH COURSE: SLIDE 5.3 — Variables -->
+<section>
+  <section>
+    <h2>Prolog Crash Course (3/10)</h2>
+    <h3>Variables and Anonymous Variables</h3>
+    <p style="font-size: 0.6em;">Variables = <span class="highlight-yellow">uppercase or underscore</span>. Atoms (constants) = <span class="highlight-blue">lowercase</span>. This is the <span class="highlight-pink">opposite</span> of most languages!</p>
+    <pre style="font-size: 0.5em;"><code class="language-prolog" data-trim>
+      parent(john, mary).  % john and mary are ATOMS (constants)
+      parent(John, mary).  % John is a VARIABLE (matches anything)
+
+      % The anonymous variable _ : each _ is INDEPENDENT
+      parent(_, _).
+      % Means "someone is parent of someone"
+      % The two _ can be different people — they're unique vars
+
+      % In queries, _ means "I don't care what this is"
+      % ?- parent(john, _).
+      % → true  (we don't care which child)
+    </code></pre>
+    <p style="font-size: 0.55em;">This is like Python's <code>_</code> convention in unpacking: <code>first, *_, last = items</code> — but in Prolog, each <code>_</code> is guaranteed independent, not just convention.</p>
+  </section>
+  <section>
+    <h3>How PeTTa Uses Variables</h3>
+    <div style="font-size: 0.55em;">
+      <p class="highlight-orange">MeTTa <code>$x</code> → Prolog variable <code>X</code>:</p>
+      <p>The parser (parser.pl) converts <code>$x</code> to a Prolog variable. All occurrences of <code>$x</code> in the same expression share the SAME variable:</p>
+      <pre><code class="language-plaintext" data-trim>
+        MeTTa: (= (myfunc $x) (+ $x 1))
+               ↓ parser
+        Prolog: [=, [myfunc, X], [+, X, 1]]
+               ↓ translator
+        Clause: myfunc(X, Out) :- Out is X + 1.
+      </code></pre>
+      <p class="highlight-orange">Anonymous variable use in spaces:</p>
+      <pre><code class="language-plaintext" data-trim>
+        (match &self (parent $who _) $who)
+        % Find all parents — we don't care about the child
+      </code></pre>
+      <p class="highlight-orange">Translate args with <code>_</code> for unused:</p>
+      <pre><code class="language-prolog" data-trim>
+        % When compiling, the parser uses _ for repeated $_
+        % MeTTa: (f $_ $_)  →  Prolog: [f, _, _]
+        % The two _ are DIFFERENT variables — no relationship!
+      </code></pre>
+    </div>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- PROLOG CRASH COURSE: SLIDE 5.4 — Lists -->
+<section>
+  <section>
+    <h2>Prolog Crash Course (4/10)</h2>
+    <h3>Lists</h3>
+    <p style="font-size: 0.6em;">Prolog lists use <code>[a, b, c]</code> but are <span class="highlight-pink">linked lists</span> underneath, not arrays. The <code>|</code> separates head from tail.</p>
+    <pre style="font-size: 0.5em;"><code class="language-prolog" data-trim>
+      [1, 2, 3]  % Syntactic sugar for .(1, .(2, .(3, [])))
+                  % Like Lisp's (cons 1 (cons 2 (cons 3 nil)))
+
+      % Head/Tail decomposition:
+      [H|T] = [a, b, c].  % H = a, T = [b, c]
+
+      % Multiple extraction:
+      [A, B|Rest] = [1, 2, 3, 4].  % A=1, B=2, Rest=[3,4]
+
+      % Lists can be nested, mixed types:
+      [a, [b, c], 42, "hello"]
+    </code></pre>
+    <p style="font-size: 0.55em;">Python equivalent: <code>first, *rest = [1, 2, 3]</code> — but Prolog's unification works both ways: <code>[H|T] = [1, 2, 3]</code> gives you <code>H=1, T=[2,3]</code>, AND <code>[1|[2,3]] = [1, 2, 3]</code> is true.</p>
+  </section>
+  <section>
+    <h3>How PeTTa Uses Lists</h3>
+    <div style="font-size: 0.55em;">
+      <p class="highlight-orange">THIS IS THE MOST IMPORTANT INSIGHT:</p>
+      <p><span class="highlight-pink">All MeTTa S-expressions become Prolog lists:</span></p>
+      <pre><code class="language-plaintext" data-trim>
+        MeTTa:  (+ 1 2)            →  Prolog: [+, 1, 2]
+        MeTTa:  (parent Alice Bob) →  Prolog: [parent, alice, bob]
+        MeTTa:  (= (f $x) (+ $x))  →  Prolog: [=, [f, X], [+, X]]
+      </code></pre>
+      <p>The parser converts text to lists. The translator walks these lists to generate goals. The choice between "this is code" vs "this is data" depends on <span class="highlight-yellow">whether the first element is registered as a function</span>.</p>
+      <pre><code class="language-prolog" data-trim>
+        % In spaces.pl — storing atoms:
+        add_sexp(Space, [Rel|Args]) :-
+            Term =.. [Space, Rel | Args],  % Build space predicate
+            assertz(Term).                  % Assert as fact
+
+        % In translator — head/tail destructuring:
+        translate_expr([H|T], Goals, Out) :-
+            % H is the function name (like +, if, match, etc.)
+            % T is the argument list
+      </code></pre>
+      <p>List operations in MeTTa (car-atom, cdr-atom, cons-atom) are direct wrappers around Prolog's <code>[H|T]</code> unification. When you see <code>(cons-atom H T)</code> in MeTTa, it's literally just Prolog's <code>[H|T]</code> under the hood.</p>
+    </div>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- PROLOG CRASH COURSE: SLIDE 5.5 — Cut (!) -->
+<section>
+  <section>
+    <h2>Prolog Crash Course (5/10)</h2>
+    <h3>Cut (!)</h3>
+    <p style="font-size: 0.6em;">Cut tells Prolog: <span class="highlight-pink">"commit to this choice, don't try alternatives"</span>. Like <code>break</code> + <code>return</code> in a loop.</p>
+    <pre style="font-size: 0.5em;"><code class="language-prolog" data-trim>
+      max(A, B, A) :- A >= B, !.   % If A >= B, commit (don't try next clause)
+      max(_, B, B).                 % Only reached if A < B
+
+      % Without cut:
+      % ?- max(5, 3, X).  →  X = 5 ;  X = 3  (WRONG — two answers!)
+      % With cut:
+      % ?- max(5, 3, X).  →  X = 5  (only one — correct)
+    </code></pre>
+    <p style="font-size: 0.55em;">Cut prevents <span class="highlight-yellow">backtracking</span> — Prolog's built-in search for alternative solutions. After cut, Prolog discards all choice points created since the parent goal was called.</p>
+    <p style="font-size: 0.5em;">Two types of cuts: <span class="highlight-green">green cuts</span> (don't change logical meaning, just optimize) and <span class="highlight-orange">red cuts</span> (change logical meaning — use carefully).</p>
+  </section>
+  <section>
+    <h3>How PeTTa Uses Cut</h3>
+    <div style="font-size: 0.55em;">
+      <p class="highlight-orange">1. The <code>cut</code> operator in MeTTa:</p>
+      <pre><code class="language-lisp" data-trim>
+        ;; Translates directly to Prolog's !/0
+        (let $temp (cut) 42)
+        ;; → Once we reach this, commit to current bindings
+      </code></pre>
+      <pre><code class="language-prolog" data-trim>
+        % In translator.pl (line 115):
+        ; HV == cut, T = [] -> append(GsH, [(!)], Goals),
+        % Just generates a Prolog cut!
+      </code></pre>
+      <p class="highlight-orange">2. Preventing choice points in Prolog-backed libraries:</p>
+      <pre><code class="language-prolog" data-trim>
+        'write-stream'(Name, Content, true) :-
+            open_stream(Name, Stream), !,
+            write(Stream, Content).
+        % Without cut: if write fails, it backtracks to find
+        % another open_stream/2 fact — WRONG behavior!
+      </code></pre>
+      <p class="highlight-orange">3. In the type system:</p>
+      <pre><code class="language-prolog" data-trim>
+        'get-type'(X, 'Number')   :- number(X), !.
+        'get-type'(X, 'String')   :- string(X), !.
+        'get-type'(X, 'Bool')     :- member(X,[true,false]), !.
+        'get-type'(X, '%Undefined%').  % Default fallback
+        % Cuts ensure we stop at the FIRST matching type
+        % —without them, a number could also match '%Undefined%'
+      </code></pre>
+      <p class="highlight-orange">4. In match/case semantics:</p>
+      <pre><code class="language-plaintext" data-trim>
+        (case (superpose (1 2 3))
+              ((1 "one")
+               (2 "two")
+               (3 "three")))
+        % cut ensures: once a branch matches, stop looking
+      </code></pre>
+    </div>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- PROLOG CRASH COURSE: SLIDE 5.6 — assertz / retractall -->
+<section>
+  <section>
+    <h2>Prolog Crash Course (6/10)</h2>
+    <h3>assertz / retractall</h3>
+    <p style="font-size: 0.6em;">Modify Prolog's <span class="highlight-yellow">database of facts and rules</span> at runtime. Like appending to or clearing entries from a global list.</p>
+    <pre style="font-size: 0.5em;"><code class="language-prolog" data-trim>
+      assertz(Clause).     % Add clause at the END
+      asserta(Clause).     % Add clause at the BEGINNING
+      retractall(Pattern). % Remove ALL clauses matching Pattern
+
+      % Example:
+      assertz(my_pred(hello)).          % Database now has my_pred(hello)
+      assertz(my_pred(world)).          % my_pred(hello), my_pred(world)
+      retractall(my_pred(_)).            % Remove all my_pred clauses
+    </code></pre>
+    <p style="font-size: 0.55em;">Python equivalent: manipulating a module-level list of registered items. <code>assertz</code> = <code>db.append(clause)</code>, <code>retractall</code> = <code>db[:] = [c for c in db if not matches(pattern, c)]</code>.</p>
+    <p style="font-size: 0.55em;"><span class="highlight-pink">Critical:</span> Only works for predicates declared <code>:- dynamic</code>. Static predicates can't be modified at runtime.</p>
+  </section>
+  <section>
+    <h3>How PeTTa Uses assertz / retractall</h3>
+    <div style="font-size: 0.55em;">
+      <p class="highlight-orange">1. Adding atoms to spaces:</p>
+      <pre><code class="language-prolog" data-trim>
+        add_sexp(Space, [Rel|Args]) :-
+            Term =.. [Space, Rel | Args],
+            assertz(Term).  % Add as a space fact
+
+        % MeTTa: (add-atom &self (parent Alice Bob))
+        % → assertz('&self'(parent, alice, bob))
+      </code></pre>
+      <p class="highlight-orange">2. Compiling MeTTa functions to Prolog:</p>
+      <pre><code class="language-prolog" data-trim>
+        'add-atom'(Space, Term, true) :-
+            Term = [=,[FAtom|W],_], !,  % It's a function definition
+            once(translate_clause(Term, Clause)),  % Compile to Prolog
+            assertz(Clause, Ref),                  % Assert compiled clause
+            assertz(translated_from(Ref, Term)).
+            % Ref lets us find and remove it later
+      </code></pre>
+      <p class="highlight-orange">3. Function registration:</p>
+      <pre><code class="language-prolog" data-trim>
+        register_fun(N) :-
+            (fun(N) -> true      % Skip if already registered
+                      ; assertz(fun(N)) ).  % Add to registry
+      </code></pre>
+      <p class="highlight-orange">4. Removing atoms and functions:</p>
+      <pre><code class="language-prolog" data-trim>
+        remove_sexp(Space, [Rel|Args]) :-
+            Term =.. [Space, Rel | Args],
+            retractall(Term).  % Remove all matching atoms
+
+        'remove-atom'(Space, Term, true) :-
+            findall(Ref, translated_from(Ref, Term), Refs),
+            forall(member(Ref, Refs), erase(Ref)),  % Erase compiled clauses
+            retractall(translated_from(_, Term)).    % Clean tracking
+      </code></pre>
+      <p class="highlight-pink">Why Ref matters:</p>
+      <p><code>assertz(Clause, Ref)</code> returns a <code>Ref</code> handle. This is how PeTTa can later <code>erase(Ref)</code> to remove a specific compiled clause — like tracking object references for cleanup. Without it, you'd have to retractall, which removes too much.</p>
+    </div>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- PROLOG CRASH COURSE: SLIDE 5.7 — Dynamic Predicates -->
+<section>
+  <section>
+    <h2>Prolog Crash Course (7/10)</h2>
+    <h3>Dynamic Predicates</h3>
+    <p style="font-size: 0.6em;">Declares: <span class="highlight-pink">"this predicate will change at runtime"</span>. Without this, Prolog assumes clauses are fixed after loading.</p>
+    <pre style="font-size: 0.5em;"><code class="language-prolog" data-trim>
+      :- dynamic my_store/2.   % Declaration — must be at compile time
+
+      % Now you can modify it at runtime:
+      assertz(my_store(key, value)).
+      retractall(my_store(_, _)).
+      my_store(key, Value).  % Querying also works
+
+      % Without :- dynamic:
+      % assertz(my_store(key)) → ERROR! Can't modify static predicate
+    </code></pre>
+    <p style="font-size: 0.55em;">Why it's needed: Prolog compilers optimize static predicates for fast lookup. Dynamic predicates use a different internal representation that supports runtime modification at a small performance cost.</p>
+    <p style="font-size: 0.55em;">Python equivalent: a module-level variable <code>my_store: dict</code> versus a frozen <code>types.MappingProxyType</code>. Dynamic = mutable, static = frozen.</p>
+  </section>
+  <section>
+    <h3>How PeTTa Uses Dynamic Predicates</h3>
+    <div style="font-size: 0.55em;">
+      <p class="highlight-orange">Dynamic predicates are <span class="highlight-pink">EVERYWHERE</span> in PeTTa:</p>
+      <table style="font-size: 0.85em;">
+        <tr><th>Dynamic Predicate</th><th>File</th><th>Purpose</th></tr>
+        <tr><td><code>fun/1</code></td><td>metta.pl:301</td><td>Function registry — tracks all callable MeTTa functions</td></tr>
+        <tr><td><code>'get-type'/2</code></td><td>metta.pl:170</td><td>Type system — resolves types of terms at runtime</td></tr>
+        <tr><td><code>translator_rule/1</code></td><td>metta.pl:294</td><td>Custom translator hooks — user-extensible</td></tr>
+        <tr><td><code>translated_from/2</code></td><td>spaces.pl</td><td>Maps compiled clauses back to MeTTa source</td></tr>
+        <tr><td><code>ho_specialization/2</code></td><td>specializer.pl:1</td><td>Tracks created specializations</td></tr>
+        <tr><td><code>open_stream/2</code></td><td>lib_fileio.pl:5</td><td>Named file stream registry</td></tr>
+        <tr><td><code>export_dir/1</code></td><td>lib_fileio.pl:6</td><td>Export directory state</td></tr>
+        <tr><td><code>async_export_task/3</code></td><td>lib_fileio.pl:7</td><td>Background export task tracking</td></tr>
+      </table>
+      <p style="margin-top: 0.5em;" class="highlight-pink">The space system itself:</p>
+      <p>When you write <code>'&self'(parent, alice, bob)</code>, <code>&self</code> is effectively a dynamic predicate. Every named space becomes a dynamic predicate. The space system <span class="highlight-yellow">implicitly</span> relies on the Prolog database being dynamic — if spaces were static, you couldn't add facts at runtime.</p>
+      <pre><code class="language-prolog" data-trim>
+        % Library state pattern — always use :- dynamic:
+        :- dynamic(counter/1).
+        'inc-counter!'(Name, true) :-
+            retract(counter(Name, Old)),  % Remove old value
+            New is Old + 1,
+            asserta(counter(Name, New)).   % Store new
+      </code></pre>
+      <p class="highlight-green">Key Rule:</p>
+      <p>If your Prolog-backed library holds state, declare <code>:- dynamic</code>. Forgetting this is the #1 cause of silent failures in Prolog-backed libraries.</p>
+    </div>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- PROLOG CRASH COURSE: SLIDE 5.8 — nb_setval / nb_getval -->
+<section>
+  <section>
+    <h2>Prolog Crash Course (8/10)</h2>
+    <h3>nb_setval / nb_getval (Non-Backtrackable Storage)</h3>
+    <p style="font-size: 0.6em;">Global key-value storage that <span class="highlight-pink">survives backtracking</span>. Normal variables lose bindings on backtrack — nb_* values persist.</p>
+    <pre style="font-size: 0.5em;"><code class="language-prolog" data-trim>
+      nb_setval(counter, 0).        % Set global value — overwrites
+      nb_getval(counter, N).        % Retrieve current value
+      nb_delete(counter).           % Remove entirely
+
+      % Key difference from assertz:
+      % nb_setval stores ONE value per key (like a dict)
+      % assertz accumulates MANY clauses (like a list)
+
+      % Key difference from normal variables:
+      % Normal: X = 1 ; fail. → X is unbound again
+      % nb: nb_setval(x, 1) ; fail. → x is STILL 1
+    </code></pre>
+    <p style="font-size: 0.55em;">Python equivalent: a module-level dict that persists regardless of exceptions or control flow.</p>
+    <p style="font-size: 0.55em;"><span class="highlight-yellow">Why "non-backtrackable"?</span> When Prolog backtracks (trying alternative solutions), normal variable bindings are undone. nb_* values are stored in the global environment, not on the stack, so they survive.</p>
+  </section>
+  <section>
+    <h3>How PeTTa Uses nb_setval / nb_getval</h3>
+    <div style="font-size: 0.55em;">
+      <p class="highlight-orange">1. Function meta-clause storage:</p>
+      <pre><code class="language-prolog" data-trim>
+        % In translate_clause (translator.pl:23-24):
+        catch(nb_getval(F, Prev), _, Prev = []),
+        nb_setval(F, [fun_meta(Args1, BodyExpr) | Prev]).
+        % Each new (= (F ...) ...) definition appends a meta-clause
+        % This is how PeTTa handles MULTIPLE definitions of the
+        % same function (like pattern matching clauses)!
+      </code></pre>
+      <p class="highlight-orange">2. Lambda counter:</p>
+      <pre><code class="language-prolog" data-trim>
+        % In translator.pl (lines 432-435):
+        next_lambda_name(Name) :-
+            catch(nb_getval(lambda_counter, Prev), _, Prev = 0),
+            N is Prev + 1,
+            nb_setval(lambda_counter, N),
+            format(atom(Name), 'lambda_~d', [N]).
+        % Each (|-> ($x) ...) gets a unique name like lambda_1
+        % Counter survives backtracking — no duplicate names!
+      </code></pre>
+      <p class="highlight-orange">3. Specialization flag:</p>
+      <pre><code class="language-prolog" data-trim>
+        % In specializer.pl (line 42):
+        nb_getval(specneeded, true),
+        % Only proceed if specialization actually helped
+        % Set by var_use_check (line 79):
+        nb_setval(specneeded, true)
+        % When a variable is detected as a function head call
+      </code></pre>
+      <p class="highlight-orange">4. State variables in MeTTa:</p>
+      <pre><code class="language-lisp" data-trim>
+        ;; MeTTa interface to nb_setval/nb_getval:
+        ^(change-state! &myvar myvalue)   % nb_setval(&myvar, myvalue)
+        (get-state &myvar)                 % nb_getval(&myvar, Value)
+        (bind! &myvar ['new-state', X] Y)  % nb_setval(&myvar, X) → Y
+      </code></pre>
+      <pre><code class="language-prolog" data-trim>
+        % Implementation in metta.pl (lines 240-242):
+        'bind!'(A, ['new-state', B], C) :- 'change-state!'(A, B, C).
+        'change-state!'(Var, Value, true) :- nb_setval(Var, Value).
+        'get-state'(Var, Value) :- nb_getval(Var, Value).
+      </code></pre>
+      <p class="highlight-pink">When to use nb_* vs assertz:</p>
+      <table style="font-size: 0.85em;">
+        <tr><th>Use Case</th><th>Tool</th><th>Why</th></tr>
+        <tr><td>Single global value (counter, flag, registry)</td><td>nb_setval</td><td>Overwrite semantics, fast access</td></tr>
+        <tr><td>Collection of facts (space atoms, clauses)</td><td>assertz/retractall</td><td>Multiple entries, pattern-based query</td></tr>
+      </table>
+    </div>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- PROLOG CRASH COURSE: SLIDE 5.9 — call/1 and =../2 -->
+<section>
+  <section>
+    <h2>Prolog Crash Course (9/10)</h2>
+    <h3>call/1 and =../2 (Univ)</h3>
+    <p style="font-size: 0.6em;"><code>call/1</code> = dynamic goal invocation. <code>=../2</code> = convert between term and list form. Together they make Prolog <span class="highlight-pink">homoiconic</span> — code is data.</p>
+    <pre style="font-size: 0.5em;"><code class="language-prolog" data-trim>
+      % =.. ("univ") converts term ↔ list:
+      Term =.. [hello, a, b].
+      % Term = hello(a, b)  — construct from list
+
+      hello(a, b) =.. [Name|Args].
+      % Name = hello, Args = [a, b]  — deconstruct to list
+
+      % call/1 runs a term as a goal:
+      Goal = hello(world),
+      call(Goal).  % Same as: hello(world)
+
+      % Combined:
+      Goal =.. [my_pred, X],  % Construct goal dynamically
+      call(Goal).             % Execute it
+    </code></pre>
+    <p style="font-size: 0.55em;">Python equivalent: <code>getattr(module, "func_name")(*args)</code> for call, and <code>[func.__name__, *func.args]</code> for univ. But Prolog's version is simpler and built into every term.</p>
+  </section>
+  <section>
+    <h3>How PeTTa Uses call/1 and =../2</h3>
+    <div style="font-size: 0.55em;">
+      <p class="highlight-orange">1. The TRANSLATOR uses =.. to build calls:</p>
+      <pre><code class="language-prolog" data-trim>
+        % When translating (myfunc $a $b):
+        % Known function → construct predicate call
+        append(AVs, [Out], CallArgs),      % Add output var at end
+        Goal =.. [Fun|CallArgs],           % Build myfunc(a, b, Out)
+        append(Inner, [Goal], Goals)       % Add to goal list
+      </code></pre>
+      <p class="highlight-orange">2. The RUNTIME uses call/1 to execute goals:</p>
+      <pre><code class="language-prolog" data-trim>
+        % In metta.pl (lines 245-250):
+        eval(C, Out) :-
+            translate_expr(C, Goals, Out),  % Get goal list
+            call_goals(Goals).               % Execute each
+
+        call_goals([]).
+        call_goals([G|Gs]) :-
+            call(G),          % Execute one goal
+            call_goals(Gs).   % Continue with rest
+      </code></pre>
+      <p class="highlight-orange">3. reduce/2 uses it for runtime dispatch:</p>
+      <pre><code class="language-prolog" data-trim>
+        % translator.pl (lines 50-58):
+        reduce([F|Args], Out) :-
+            % If F is registered AND has a defined predicate:
+            current_predicate(F/Arity), ...
+            append(Args,[Out],CallArgs),
+            Goal =.. [F|CallArgs],    % Build goal dynamically
+            catch(call(Goal),_,fail)  % Execute with error handling
+
+        % This is how PeTTa handles function calls when the
+        % function name is only known AT RUNTIME.
+      </code></pre>
+      <p class="highlight-orange">4. Typed dispatch uses it:</p>
+      <pre><code class="language-prolog" data-trim>
+        % When multiple types exist for the same function,
+        % =.. builds different branches:
+        typed_functioncall_branch(Fun, TypeChain, ...) :-
+            % Each branch calls the same Fun but with
+            % different type-checking goals prepended
+            build_call_or_partial(Fun, AVs, Out, ...).
+      </code></pre>
+      <p class="highlight-pink">Why this matters:</p>
+      <p>Without <code>call/1</code> and <code>=../2</code>, PeTTa could not dynamically compile MeTTa code at runtime. They are the bridge between "MeTTa code as data (lists)" and "Prolog code as executable predicates." Every <code>(match ...)</code>, every <code>(reduce ...)</code>, every lambda invocation uses these two constructs internally.</p>
+    </div>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- PROLOG CRASH COURSE: SLIDE 5.10 — term_variables/2 -->
+<section>
+  <section>
+    <h2>Prolog Crash Course (10/10)</h2>
+    <h3>term_variables/2</h3>
+    <p style="font-size: 0.6em;">Extracts all Prolog variables from a term into a <span class="highlight-yellow">list in order of first appearance</span>, deduplicated. Like walking an AST and collecting every identifier.</p>
+    <pre style="font-size: 0.5em;"><code class="language-prolog" data-trim>
+      term_variables(Term, Vars).
+      % Vars = [all variables in Term, first-appearance order]
+
+      % Example:
+      term_variables( (parent(X, Y), grandparent(Y, Z)), Vars).
+      % Vars = [X, Y, Z]
+    </code></pre>
+    <p style="font-size: 0.55em;">Python has no direct equivalent because Python doesn't track variables as first-class objects you can enumerate. The closest is the <code>inspect</code> module or AST walking — but Prolog makes variable introspection trivial.</p>
+    <p style="font-size: 0.55em;"><span class="highlight-pink">This is a unique Prolog superpower.</span> No other mainstream language gives you direct access to the variable structure of any expression.</p>
+  </section>
+  <section>
+    <h3>How PeTTa Uses term_variables/2</h3>
+    <div style="font-size: 0.55em;">
+      <p class="highlight-orange">1. Lambda compilation — the KEY use case:</p>
+      <pre><code class="language-prolog" data-trim>
+        % translator.pl (lines 237-252):
+        ; HV == '|->', T = [Args, Body] ->
+          next_lambda_name(F),
+          term_variables(Body, AllVars),      % ALL vars in body
+          term_variables(Args, ArgVars),       % Only arg vars
+          exclude({ArgVars}/[V]>>
+                    memberchk_eq(V, ArgVars),
+                  AllVars, FreeVars),          % What's left = FREE vars
+          append(FreeVars, Args, FullArgs),    % Capture + args
+          translate_clause([=, [F|FullArgs], Body], Clause),
+          ...
+          ( FreeVars == [] -> Out = F          % No closure needed
+                            ; Out = partial(F, FreeVars) )  % Closure!
+      </code></pre>
+      <p style="font-size: 0.5em;">When you write <code>(|-> ($x) (+ $x $y))</code>, <code>$y</code> is a <span class="highlight-pink">free variable</span> — it must be captured from the surrounding scope. <code>term_variables</code> detects this.</p>
+      <pre><code class="language-plaintext" data-trim>
+        MeTTa:  (|-> ($x) (+ $x $y))
+                ↓
+        AllVars = [X, Y]     (all vars in the body)
+        ArgVars = [X]         ($x is the argument)
+        FreeVars = [Y]        ($y captured from environment!)
+                ↓
+        Out = partial(lambda_1, [Y])  A CLOSURE carrying Y
+      </code></pre>
+      <p class="highlight-orange">2. Let/Chain variable tracking:</p>
+      <pre><code class="language-prolog" data-trim>
+        % In let translation — variables in patterns work via
+        % Prolog's built-in variable sharing, but term_variables
+        % is used for more complex pattern analysis
+      </code></pre>
+      <p class="highlight-orange">3. The sealed construct:</p>
+      <pre><code class="language-prolog" data-trim>
+        ; HV == sealed, T = [Vars, Expr] ->
+          translate_expr_to_conj(Expr, Con, Val),
+          Goals = [copy_term(Vars, [Con, Val], _, [Ncon, Out]), Ncon]
+          % Makes a COPY of all variables — isolates computation
+      </code></pre>
+      <p class="highlight-pink">Why this is critical for PeTTa:</p>
+      <p>Lambdas with free variables = <span class="highlight-yellow">closures</span>. Without <code>term_variables/2</code>, PeTTa couldn't distinguish between argument variables (bound) and environment variables (captured). Every lambda like <code>(|-> ($x) ($f $x))</code> where <code>$f</code> comes from outside relies on this analysis to become a <code>partial(F, [f])</code> closure at runtime. The distinction between <code>F</code> (a plain callable) and <code>partial(F, Bound)</code> (a closure carrying captured values) is entirely driven by <code>term_variables/2</code>.</p>
+    </div>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 6: The Three Layers -->
+<section>
+  <h2>The Library System: Three Layers</h2>
+  <div style="font-size: 0.6em;">
+    <div class="architecture-box" style="border-color: #50fa7b;">
+      <span class="highlight-green">Layer 1:</span> Pure MeTTa <code>lib_*.metta</code><br>
+      <span class="small-text">"Pure logic: list ops, math, reasoning rules"</span>
+    </div>
+    <div style="height: 0.3em;"></div>
+    <div class="architecture-box" style="border-color: #ffb86c;">
+      <span class="highlight-orange">Layer 2:</span> Prolog-Backed <code>lib_*.pl</code> + <code>lib_*.metta</code><br>
+      <span class="small-text">"I/O, system calls, performance"</span>
+    </div>
+    <div style="height: 0.3em;"></div>
+    <div class="architecture-box" style="border-color: #8be9fd;">
+      <span class="highlight-blue">Layer 3:</span> Python-Backed <code>lib_*.py</code><br>
+      <span class="small-text">"ML/AI, LLMs, string processing"</span>
+    </div>
+  </div>
+  <table style="font-size: 0.55em; margin-top: 0.5em;">
+    <tr><th>Need</th><th>Layer</th></tr>
+    <tr><td>Pure logic, list ops, math</td><td><span class="highlight-green">Pure MeTTa</span></td></tr>
+    <tr><td>System access, performance</td><td><span class="highlight-orange">Prolog</span></td></tr>
+    <tr><td>Python libs, LLMs, ML</td><td><span class="highlight-blue">Python</span></td></tr>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 7: Layer 1 — Pure MeTTa -->
+<section>
+  <h2>Layer 1: Pure MeTTa Libraries</h2>
+  <p>Just <code class="highlight-yellow">(= ...)</code> definitions — the simplest form</p>
+  <pre><code class="language-lisp" data-trim>
+    ;; lib_combinatorics.metta
+
+    (: range (-> Number Number Expression))
+    (= (range $K $N)
+       (if (< $K $N)
+           (superpose ($K (range (+ $K 1) $N)))
+           (empty)))
+
+    (: choose2 (-> Expression Expression))
+    (= (choose2 $L)
+       (let $j (range 0 (length $L))
+            (let $i (range 0 $j)
+                 ((index-atom $L $i) (index-atom $L $j)))))
+  </code></pre>
+  <pre><code class="language-lisp" data-trim>
+    ;; Usage
+    !(import! &self (library lib_combinatorics))
+    (range 0 5)  ;; → 0, 1, 2, 3, 4 (non-deterministically)
+  </code></pre>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 8: Layer 1 — Import Flow -->
+<section>
+  <h2>Layer 1: How Import Works</h2>
+  <pre style="font-size: 0.5em;"><code class="language-plaintext" data-trim>
+    (import! &self (library lib_combinatorics))
+         │
+         ▼
+    (library lib_combinatorics)  ──→  library_path("/path/PeTTa/lib")
+         │                              + "/lib_combinatorics"
+         │                              + ".metta"  (ensure_metta_ext)
+         ▼
+    "lib/lib_combinatorics.metta"
+         │
+         ▼
+    load_metta_file("lib/lib_combinatorics.metta", _, "&self")
+         │
+         ├── read_file_to_string  ──→  raw source code
+         ├── parse_forms ──→  S-expressions → Prolog terms
+         │     register_fun(range), register_fun(choose2)
+         │     assertz(arity(range, 3)), assertz(arity(choose2, 3))
+         │
+         └── process_forms
+               ├── function: translate_clause → assertz(Clause)
+               └── expression: translate_expr → call_goals
+  </code></pre>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 9: Layer 2 — Prolog-Backed -->
+<section>
+  <section>
+    <h2>Layer 2: Prolog-Backed Libraries</h2>
+    <p>When you need system access or performance</p>
+    <h3>The Function Convention</h3>
+    <pre><code class="language-prolog" data-trim>
+      % Last argument = OUTPUT (return value)
+      % Preceding args = INPUTS
+      % Succeed exactly once (deterministic)
+
+      'my-function'(Input1, Input2, Result) :-
+          Result is Input1 + Input2.
+    </code></pre>
+    <pre><code class="language-lisp" data-trim>
+      ;; Called from MeTTa:
+      (my-function 3 5)  ;; → 8
+    </code></pre>
+  </section>
+  <section>
+    <h2>Prolog-Backed: File I/O Example</h2>
+    <pre style="font-size: 0.45em;"><code class="language-prolog" data-trim>
+      % lib_fileio.pl — Prolog predicates in function convention
+
+      :- dynamic(open_stream/2).  % Stateful stream registry
+
+      % Simple file write
+      'write-file'(File, Content, true) :-
+          resolve_export_path(File, AbsPath),
+          open(AbsPath, write, Stream),
+          write(Stream, Content),
+          close(Stream).
+
+      % Named stream operations
+      'open-writer'(Name, File, true) :-
+          resolve_export_path(File, AbsPath),
+          open(AbsPath, write, Stream),
+          asserta(open_stream(Name, Stream)).
+
+      'write-stream'(Name, Content, true) :-
+          open_stream(Name, Stream), !,
+          write(Stream, Content).
+
+      'close-stream'(Name, true) :-
+          open_stream(Name, Stream), !,
+          close(Stream),
+          retractall(open_stream(Name, _)).
+    </code></pre>
+  </section>
+  <section>
+    <h2>The Loader .metta File</h2>
+    <pre style="font-size: 0.5em;"><code class="language-lisp" data-trim>
+      ;; lib_fileio.metta — the loader that connects Prolog to MeTTa
+
+      !(import! &self (library lib_import.metta))
+
+      !(import_prolog_functions_from_file (library lib_fileio.pl)
+          (write-file append-file read-file
+           open-writer open-appender write-stream
+           writeln-stream flush-stream close-stream
+           export-space export-self export-to-stream
+           export-space-async export-status export-join
+           set-export-dir!))
+    </code></pre>
+    <p style="font-size: 0.5em;">This is the <span class="highlight-pink">standard pattern</span> for all Prolog-backed libraries</p>
+  </section>
+  <section>
+    <h2>What the Loader Does</h2>
+    <pre style="font-size: 0.5em;"><code class="language-lisp" data-trim>
+      (import_prolog_functions_from_file
+          (library lib_fileio.pl)     ;; Step 1: resolve path
+          (write-file ...))           ;; Step 2: list function names
+
+      ;; Step-by-step (from lib_import.metta):
+    </code></pre>
+    <pre style="font-size: 0.45em;"><code class="language-lisp" data-trim>
+      (= (import_prolog_functions_from_file
+              $prologfile $importfunctions)
+
+         (let* (($prologfile (exists_file))    ;; 1. Check file exists
+                ($prologfile (consult))         ;; 2. Load .pl → assert all predicates
+                ($function                      ;; 3. Non-deterministically
+                  (superpose $importfunctions)));;    iterate function names
+                (import_prolog_function         ;; 4. Register each as MeTTa func
+                  $function)))
+    </code></pre>
+    <p style="font-size: 0.5em;"><code>import_prolog_function(F)</code> calls <code class="highlight-green">register_fun(F)</code></p>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 10: Layer 3 — Python-Backed -->
+<section>
+  <h2>Layer 3: Python-Backed Libraries</h2>
+  <p>Access Python libraries (LLMs, numpy, etc.) via <code class="highlight-blue">janus</code></p>
+  <pre style="font-size: 0.5em;"><code class="language-lisp" data-trim>
+    ;; lib_llm.metta — using Python's OpenAI API
+
+    ^(import! &self (library lib_llm.py))
+
+    ^(change-state! &openai_client
+        (py-call (openai.OpenAI)))
+
+    (= (useGPT $prompt)
+       (useGPT "gpt-5.2" 1000000 "medium" $prompt))
+
+    (= (useGPT $model $max_tokens $effort $prompt)
+       (let* (($client    (get-state &openai_client))
+              ($responses (py-call (getattr $client "responses")))
+              ($create    (py-call (getattr $responses "create")))
+              ($kwargs    (py-call (builtins.make_openai_responses_kwargs
+                                    $model $max_tokens $effort $prompt)))
+              ($res       (py-call (builtins.apply_kwargs $create $kwargs)))
+              ($text      (py-call (getattr $res "output_text")))
+              ($_ (cut)))
+              $text))
+  </code></pre>
+  <p><code class="highlight-green">py-call</code> supports: <code>"mod.fun"</code>, <code>".method"</code>, <code>"bare"</code> (builtins)</p>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 11: The Translation Layer -->
+<section>
+  <section>
+    <h2>The Translation Layer</h2>
+    <p class="highlight-pink" style="font-size: 0.8em;">The heart of PeTTa — <code>translator.pl</code></p>
+    <h3><code>translate_expr/3</code></h3>
+    <pre><code class="language-prolog" data-trim>
+      % Input:  MeTTa S-expr as Prolog list [F|Args]
+      % Goals:  Prolog goals to execute
+      % Out:    Output variable
+
+      translate_expr(Input, Goals, Out)
+    </code></pre>
+    <pre><code class="language-plaintext" data-trim>
+      MeTTa:  (+ 1 2)
+      List:   [+, 1, 2]
+
+      translate_expr([+, 1, 2], Goals, Out) →
+        Goals = ['+'(1, 2, Out)]
+        Out = 3
+    </code></pre>
+  </section>
+  <section>
+    <h2>Translator: Clause Compilation</h2>
+    <p><code>translate_clause/2</code> — converts <code>(= ...)</code> into Prolog clauses</p>
+    <pre style="font-size: 0.5em;"><code class="language-plaintext" data-trim>
+      MeTTa:  (= (myfunc $x) (+ $x 1))
+      Input:  [=, [myfunc, x], [+, x, 1]]
+
+      translate_clause(Input, Clause) →
+        Clause = (myfunc(X, Out) :- '+'(X, Out))
+        Which is Prolog: myfunc(X, Out) :- Out is X + 1.
+    </code></pre>
+    <pre style="font-size: 0.5em;"><code class="language-prolog" data-trim>
+      % The actual code:
+      translate_clause(Input, (Head :- BodyConj)) :-
+          Input = [=, [F|Args0], BodyExpr],
+          constrain_args(Args0, Args1, _GoalsA),
+          translate_expr(BodyExpr, GoalsBody, ExpOut),
+          append(Args1, [Out], FinalArgs),
+          Head =.. [F|FinalArgs],
+          goals_list_to_conj(GoalsBody, BodyConj).
+    </code></pre>
+  </section>
+  <section>
+    <h2>Translator: Dispatch Logic</h2>
+    <p style="font-size: 0.65em;">When translating <code>[H|T]</code>, the translator checks (in order):</p>
+    <ol style="font-size: 0.6em;">
+      <li><span class="highlight-pink">Translator rules</span> — custom hooks via <code>translator_rule/1</code></li>
+      <li><span class="highlight-yellow">Non-determinism</span> — <code>superpose</code>, <code>collapse</code>, <code>cut</code>, <code>once</code></li>
+      <li><span class="highlight-orange">Sequential</span> — <code>progn</code>, <code>prog1</code></li>
+      <li><span class="highlight-green">Conditionals</span> — <code>if</code>, <code>case</code></li>
+      <li><span class="highlight-blue">Binding</span> — <code>let</code>, <code>let*</code>, <code>chain</code></li>
+      <li><span class="highlight-pink">Lambdas</span> — <code>|-></code> (compiled to new Prolog predicate)</li>
+      <li><span class="highlight-orange">Spaces</span> — <code>match</code>, <code>add-atom</code>, <code>remove-atom</code></li>
+      <li><span class="highlight-yellow">Manual dispatch</span> — <code>call</code>, <code>reduce</code>, <code>eval</code>, <code>quote</code></li>
+      <li><span class="highlight-green">Smart dispatch (default)</span> — registered fun → call, else → data</li>
+    </ol>
+  </section>
+  <section>
+    <h2>Smart Dispatch: The Key Decision</h2>
+    <pre style="font-size: 0.45em;"><code class="language-prolog" data-trim>
+      % The critical decision point in translate_expr:
+
+      % Registered function → direct Prolog call
+      ( atom(HV), fun(HV) ->
+        append(AVs, [Out], CallArgs),
+        Goal =.. [HV|CallArgs],
+        append(Inner, [Goal], Goals)
+
+      % Atom that's NOT a function → data list (keep as-is)
+      ; atomic(HV), \+ fun(HV) ->
+        Out = [HV|AVs],
+        Goals = Inner
+
+      % Unknown → runtime dispatch
+      ; append(Inner, [reduce([HV|AVs], Out)], Goals) )
+    </code></pre>
+    <p class="highlight-pink">This is why <code>register_fun</code> is critical!</p>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 12: Function Registration -->
+<section>
+  <section>
+    <h2>Function Registration System</h2>
+    <h3>Why Registration Matters</h3>
+    <pre style="font-size: 0.5em;"><code class="language-prolog" data-trim>
+      % Without register_fun:
+      (my-func 3 5)  →  treated as DATA [my-func, 3, 5]
+
+      % With register_fun:
+      (my-func 3 5)  →  Prolog call: my-func(3, 5, Out)
+    </code></pre>
+    <pre style="font-size: 0.45em;"><code class="language-prolog" data-trim>
+      :- dynamic fun/1.            % Database of registered function names
+
+      register_fun(N) :-
+          (fun(N) -> true          % Skip if already registered
+                    ; assertz(fun(N)) ).   % Mark as callable
+
+      % Also stores arity for validation:
+      assertz(arity(my-func, 3)).  % 2 inputs + 1 output
+    </code></pre>
+  </section>
+  <section>
+    <h2>Automatic vs. Manual Registration</h2>
+    <div class="cols" style="font-size: 0.6em;">
+      <div class="col">
+        <p class="highlight-green">Automatic</p>
+        <pre><code class="language-lisp" data-trim>
+          ;; = definition auto-registers:
+          (= (my-func $x) (+ $x 1))
+          ;; ↓
+          register_fun(my-func)
+        </code></pre>
+      </div>
+      <div class="col">
+        <p class="highlight-yellow">Manual</p>
+        <pre><code class="language-lisp" data-trim>
+          ;; Must register Prolog predicates:
+          ^(import_prolog_function my-func)
+          ;; ↓
+          import_prolog_function(F) :-
+              register_fun(F).
+        </code></pre>
+      </div>
+    </div>
+    <p style="font-size: 0.6em; margin-top: 0.5em;">Without registration, the translator generates a <span class="highlight-pink">data list</span>, not a <span class="highlight-green">function call</span>!</p>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 13: Space System -->
+<section>
+  <section>
+    <h2>The Atom Space System</h2>
+    <p>Spaces = Prolog dynamic predicates (just collections of facts)</p>
+    <pre style="font-size: 0.45em;"><code class="language-prolog" data-trim>
+      % An atom (parent Alice Bob) is stored as:
+      '&self'(parent, alice, bob).
+
+      % The space system asserts/retracts these:
+      add_sexp(Space, [Rel|Args]) :-
+          Term =.. [Space, Rel | Args],
+          assertz(Term).
+
+      remove_sexp(Space, [Rel|Args]) :-
+          Term =.. [Space, Rel | Args],
+          retractall(Term).
+
+      'get-atoms'(Space, Pattern) :-
+          current_predicate(Space/Arity),
+          functor(Head, Space, Arity),
+          clause(Head, true),
+          Head =.. [Space | Pattern].
+    </code></pre>
+  </section>
+  <section>
+    <h2>How <code>add-atom</code> Handles Functions</h2>
+    <pre style="font-size: 0.4em;"><code class="language-prolog" data-trim>
+      % When adding a function definition (= ...):
+      'add-atom'(Space, Term, true) :-
+          Term = [=,[FAtom|W],_], !,  % It's a function!
+          add_sexp(Space, Term),       % Store in space
+          register_fun(FAtom),          % Mark as callable
+          length(W, N),
+          Arity is N + 1,
+          assertz(arity(FAtom, Arity)),
+          once(translate_clause(Term, Clause)),  % Compile to Prolog
+          assertz(Clause, Ref),
+          assertz(translated_from(Ref, Term)),
+          invalidate_specializations(FAtom).
+
+      % Regular data atoms (not functions):
+      'add-atom'(Space, Term, true) :-
+          add_sexp(Space, Term).        % Just store in space
+    </code></pre>
+  </section>
+  <section>
+    <h2>The Space Predicate Pattern</h2>
+    <pre style="font-size: 0.5em;"><code class="language-plaintext" data-trim>
+      MeTTa:  (parent Alice Bob)
+      Space:  '&self'(parent, alice, bob)
+
+      MeTTa:  (= (double $x) (+ $x $x))
+      Space:  '&self'(=, [double, x], [+, x, x])
+
+      MeTTa:  (: double (-> Number Number))
+      Space:  '&self'(:, double, [->, Number, Number])
+    </code></pre>
+    <p style="font-size: 0.6em;">Everything in MeTTa is stored as a <span class="highlight-pink">space predicate</span>:</p>
+    <pre style="font-size: 0.45em;"><code class="language-plaintext" data-trim>
+      '&self'(Data, Args...).
+
+      % Data = atom name (parent, =, :, etc.)
+      % Args = rest of S-expression
+    </code></pre>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 14: Type System -->
+<section>
+  <section>
+    <h2>The Type System</h2>
+    <h3>Type Annotations</h3>
+    <pre><code class="language-lisp" data-trim>
+      (: + (-> Number Number Number))
+      (: my-function (-> String String Bool))
+    </code></pre>
+    <p>Stored in <code>&self</code> as: <code>'&self'(:, my-function, [->, String, String, Bool])</code></p>
+    <pre style="font-size: 0.5em;"><code class="language-prolog" data-trim>
+      % Dynamic type resolution
+      'get-type'(X, 'Number')   :- number(X), !.
+      'get-type'(X, 'String')   :- string(X), !.
+      'get-type'(X, 'Bool')     :- member(X, [true, false]), !.
+      'get-type'(X, 'Symbol')   :- atom(X), \+ fun(X), !.
+      'get-type'(X, 'Expression') :- is_list(X), !.
+      'get-type'(X, '%Undefined%').  % Default fallback
+    </code></pre>
+  </section>
+  <section>
+    <h2>Metatypes vs. Types</h2>
+    <table style="font-size: 0.65em;">
+      <tr><th>Metatype</th><th>Prolog check</th><th>Examples</th></tr>
+      <tr><td><code>Variable</code></td><td><code>var(X)</code></td><td><code>$x</code> (unbound)</td></tr>
+      <tr><td><code>Grounded</code></td><td><code>number(X); string(X); fun(X)</code></td><td><code>42</code>, <code>"hello"</code>, <code>+</code></td></tr>
+      <tr><td><code>Expression</code></td><td><code>is_list(X)</code></td><td><code>(+ 1 2)</code>, <code>(a b c)</code></td></tr>
+      <tr><td><code>Symbol</code></td><td><code>atom(X)</code></td><td><code>parent</code>, <code>Alice</code></td></tr>
+    </table>
+  </section>
+  <section>
+    <h2>Typed Function Dispatch</h2>
+    <pre style="font-size: 0.45em;"><code class="language-prolog" data-trim>
+      % When a function has type annotations, the translator
+      % generates type-checked branches:
+
+      typed_functioncall_branch(Fun, TypeChain, T, Out, BranchGoal) :-
+          TypeChain = [->|Xs],
+          append(ArgTypes, [OutType], Xs),
+          translate_args_by_type(T, ArgTypes, GsT2, AVsTmp0),
+          % ... generates input type checks + output type assertion
+          ( (OutType == '%Undefined%' ; OutType == 'Atom')
+            -> Extra = []
+            ; Extra = [('get-type'(Out, OutType) *-> true ;
+                         'get-metatype'(Out, OutType))]
+          ),
+          build_call_or_partial(Fun, AVsTmp, Out, InnerTmp, Extra, ...).
+    </code></pre>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 15: Import System -->
+<section>
+  <section>
+    <h2>The Import System in Detail</h2>
+    <h3><code>import! / 3</code></h3>
+    <pre style="font-size: 0.45em;"><code class="language-prolog" data-trim>
+      'import!'(Space, File, true) :-
+          catch(importer_helper(Space, File), _, fail).
+
+      importer_helper(Space, File) :-
+          atom_string(File, SFile),
+          working_dir(Base),
+          ( file_name_extension(ModPath, 'py', SFile)
+            -> % Python import
+               absolute_file_name(SFile, Path, [relative_to(Base)]),
+               ...
+               py_call(builtins:'__import__'(ModuleName), _)
+            ;  % MeTTa import
+               ensure_metta_ext(Path, PathWithExt),
+               exists_file(PathWithExt), !,
+               load_metta_file(PathWithExt, _, Space) ).
+    </code></pre>
+  </section>
+  <section>
+    <h2>Path Resolution: <code>library/1</code></h2>
+    <pre style="font-size: 0.45em;"><code class="language-prolog" data-trim>
+      % library_path is set at startup:
+      :- prolog_load_context(directory, Source),
+         directory_file_path(Source, '..', Parent),
+         directory_file_path(Parent, 'lib', LibPath),
+         asserta(library_path(LibPath)).
+
+      % library/1 resolves names:
+      library(X, Path) :-
+          library_path(Base),
+          atomic_list_concat([Base, '/', X], Path).
+
+      % library/3 for nested paths:
+      library(X, Y, Path) :-
+          library_path(Base),
+          atomic_list_concat([Base, '/../', X, '/', Y], Path).
+    </code></pre>
+    <pre><code class="language-plaintext" data-trim>
+      (library lib_fileio)     →  "lib/lib_fileio.metta"
+      (library lib_zar.pl)     →  "lib/lib_zar.pl"
+    </code></pre>
+  </section>
+  <section>
+    <h2>Static Import: Fast Data Loading</h2>
+    <pre style="font-size: 0.45em;"><code class="language-plaintext" data-trim>
+      (static-import! &self "path/to/data")
+                      ↓
+        1. .metta → .pl  (S-expr → Prolog facts)
+        2. .pl → .qlf     (Quick Load Format)
+        3. Load .qlf       (near-instant)
+    </code></pre>
+    <pre style="font-size: 0.4em;"><code class="language-prolog" data-trim>
+      'static-import!'(Space, File, true) :-
+          % File resolution
+          MettaFile = "path/to/data.metta",
+          PlFile = "path/to/data.pl",
+          QlfFile = "path/to/data.qlf",
+
+          ( exists_file(QlfFile) → consult(QlfFile)      % Fast!
+          ; exists_file(PlFile)  → qcompile(PlFile),      % Compile
+                                    consult(QlfFile)
+          ;                       → metta_file_to_prolog( % Generate from .metta
+                                    MettaFile, Space, PlFile),
+                                    qcompile(PlFile),
+                                    consult(QlfFile) ).
+    </code></pre>
+  </section>
+  <section>
+    <h2>Git Import</h2>
+    <pre style="font-size: 0.5em;"><code class="language-lisp" data-trim>
+      ;; Clone repo and add to library path
+      ^(git-import!
+          "https://github.com/user/repo.git")
+
+      ;; With build step
+      ^(git-import!
+          "https://github.com/user/repo.git"
+          "make")
+
+      ;; Custom base directory
+      ^(git-import!
+          "https://github.com/user/repo.git"
+          "make" "./my-extensions")
+    </code></pre>
+    <pre style="font-size: 0.45em;"><code class="language-plaintext" data-trim>
+      Steps:
+        1. Extract repo name from URL ("repo")
+        2. Clone to ./repos/repo/
+        3. Run build command (if any)
+        4. Add ./repos/repo/ to library_path
+        5. Now you can: (library repo/some_file)
+    </code></pre>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 16: Specializer -->
+<section>
+  <section>
+    <h2>Higher-Order Function Specialization</h2>
+    <p class="highlight-pink"><code>specializer.pl</code></p>
+    <p style="font-size: 0.65em;">Optimizes higher-order functions by creating specialized versions</p>
+    <pre style="font-size: 0.4em;"><code class="language-lisp" data-trim>
+      ;; MeTTa: (map-atom (|-> ($x) (+ $x 1)) (1 2 3))
+      ;; Without specialization: runtime dispatch each iteration
+      ;; With specialization: compiles a dedicated predicate
+
+      ;; The specializer detects this and creates:
+      map-atom_Spec_[+]([1,2,3], Out) :-
+          maplist([X, Y]>>(Y is X + 1), [1,2,3], Out).
+    </code></pre>
+  </section>
+  <section>
+    <h2>How Specialization Works</h2>
+    <pre style="font-size: 0.4em;"><code class="language-plaintext" data-trim>
+      1. Detect call: map-atom(Func, List)
+         where Func is a registered fun (like +)
+
+      2. Extract meta-clauses for map-atom
+
+      3. Find specializable higher-order variables
+         (variables used as function heads in the body)
+
+      4. Build specialization name:
+         map-atom_Spec_[+]
+
+      5. Compile new Prolog clause with Func
+         substituted at call sites
+
+      6. Register and assert the specialization
+    </code></pre>
+    <pre style="font-size: 0.4em;"><code class="language-prolog" data-trim>
+      % The specialization name encodes the concrete args:
+      format(atom(SpecName),
+             "~w_Spec_~w", [HV, CleanBindSet])
+      % → map-atom_Spec_[+]
+    </code></pre>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 17: Step-by-Step Library Creation -->
+<section>
+  <section>
+    <h2>Step-by-Step: Create a Library</h2>
+    <h3>Scenario: A text utility library</h3>
+    <p style="font-size: 0.65em;">We want: <code>(reverse-text "hello")</code> → <code>"olleh"</code></p>
+  </section>
+  <section>
+    <h2>Option A: Pure MeTTa (if possible)</h2>
+    <pre style="font-size: 0.45em;"><code class="language-lisp" data-trim>
+      ;; lib_text.metta
+      (: reverse-text (-> String String))
+      (= (reverse-text $s) ???)
+      ;; ⚠️ Problem: string reversal is hard in pure MeTTa!
+      ;; Better to use Prolog for this.
+    </code></pre>
+    <p style="font-size: 0.6em;">When pure MeTTa is awkward → use <span class="highlight-orange">Prolog layer</span></p>
+  </section>
+  <section>
+    <h2>Option B: Prolog-Backed Library</h2>
+    <pre style="font-size: 0.45em;"><code class="language-prolog" data-trim>
+      % lib_text.pl
+      :- module(lib_text, []).
+
+      'reverse-text'(Input, Output) :-
+          string_chars(Input, Chars),
+          reverse(Chars, Reversed),
+          string_chars(Output, Reversed).
+    </code></pre>
+    <pre style="font-size: 0.45em;"><code class="language-lisp" data-trim>
+      ;; lib_text.metta
+      ^(import! &self (library lib_import.metta))
+
+      ^(import_prolog_functions_from_file
+          (library lib_text.pl)
+          (reverse-text))
+    </code></pre>
+    <pre style="font-size: 0.45em;"><code class="language-lisp" data-trim>
+      ;; Usage:
+      ^(import! &self (library lib_text))
+      (reverse-text "hello")  ;; → "olleh"
+    </code></pre>
+  </section>
+  <section>
+    <h2>Complete Pattern: Creating a Stateful Library</h2>
+    <pre style="font-size: 0.4em;"><code class="language-prolog" data-trim>
+      % lib_counter.pl
+
+      :- dynamic(counter/1).          % Mutable state
+      :- dynamic(counter_history/2).  % Log
+
+      'make-counter!'(Name, Start, true) :-
+          asserta(counter(Name, Start)).
+
+      'inc-counter!'(Name, true) :-
+          retract(counter(Name, Old)),
+          New is Old + 1,
+          asserta(counter(Name, New)),
+          asserta(counter_history(Name, New)).
+
+      'get-counter'(Name, Value) :-
+          counter(Name, Value).
+    </code></pre>
+    <pre style="font-size: 0.4em;"><code class="language-lisp" data-trim>
+      ;; lib_counter.metta
+      ^(import! &self (library lib_import.metta))
+      ^(import_prolog_functions_from_file
+          (library lib_counter.pl)
+          (make-counter! inc-counter! get-counter))
+
+      ;; Usage:
+      ^(make-counter! "my-counter" 0)
+      ^(progn ^(inc-counter! "my-counter")
+              ^(inc-counter! "my-counter")
+              (get-counter "my-counter"))  ;; → 2
+    </code></pre>
+  </section>
+  <section>
+    <h2>Verifying Your Library</h2>
+    <pre style="font-size: 0.5em;"><code class="language-lisp" data-trim>
+      ;; Create a test file: test_lib_text.metta
+
+      ^(import! &self (library lib_text))
+
+      ^(test (reverse-text "hello") "olleh")
+      ^(test (reverse-text "racecar") "racecar")
+      ^(test (reverse-text "") "")
+
+      ;; Run:
+      ;; time sh run.sh test_lib_text.metta
+    </code></pre>
+    <p style="font-size: 0.6em;">Use <code class="highlight-green">test</code> to assert expected values</p>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 18: Best Practices -->
+<section>
+  <section>
+    <h2>Best Practices</h2>
+    <h3>Prolog Predicate Design</h3>
+    <ul style="font-size: 0.6em;">
+      <li><span class="highlight-pink">Function convention:</span> Last argument = output, preceding = inputs</li>
+      <li><span class="highlight-green">Determinism:</span> Succeed exactly once (use <code>!/0</code> where needed)</li>
+      <li><span class="highlight-yellow">Side effects:</span> Return <code>true</code> for commands: <code>'my-cmd'(Arg, true)</code></li>
+      <li><span class="highlight-orange">No dangling choice points:</span> Use cut or <code>once/1</code></li>
+      <li><span class="highlight-blue">Atom names:</span> Quote with <code>'...'</code> if containing special chars</li>
+    </ul>
+    <h3 style="margin-top: 0.5em;">MeTTa Library Design</h3>
+    <ul style="font-size: 0.6em;">
+      <li>Always annotate public functions: <code>(: foo (-> Type1 Type2 Ret))</code></li>
+      <li>Group related functions with a prefix: <code>PLN.Derive</code>, <code>Truth_Revision</code></li>
+      <li>Handle errors with <code>catch</code> / <code>case</code></li>
+      <li>Pure functions in MeTTa, side-effecting in Prolog</li>
+    </ul>
+  </section>
+  <section>
+    <h2>Error Handling Patterns</h2>
+    <pre style="font-size: 0.45em;"><code class="language-lisp" data-trim>
+      ;; Safe division
+      (= (safe-divide $a $b)
+         (if (> $b 0)
+             (/ $a $b)
+             (empty)))
+
+      ;; Call with fallback
+      (= (call-with-fallback $fn $arg)
+         (case (catch ($fn $arg))
+               (((Error $type $ctx) "Error occurred")
+                ($result $result))))
+
+      ;; Using case + Empty
+      (= (lookup $key $alist)
+         (case (match &self (pair $key $value))
+               (((pair $k $v) $v)
+                (Empty "not found"))))
+    </code></pre>
+  </section>
+  <section>
+    <h2>Performance Considerations</h2>
+    <ul style="font-size: 0.6em;">
+      <li><span class="highlight-pink">Prolog layer is faster</span> than pure MeTTa for hot code</li>
+      <li><span class="highlight-green"><code>static-import!</code></span> loads large data much faster than <code>import!</code></li>
+      <li><span class="highlight-yellow"><code>collapse</code></span> collects all results into memory — use <code>foldall</code> for aggregation</li>
+      <li><span class="highlight-orange"><code>foldall</code></span> aggregates without materializing — more memory efficient</li>
+      <li>Ensure <span class="highlight-blue">tail recursion</span> in recursive MeTTa functions</li>
+    </ul>
+    <pre style="font-size: 0.5em;"><code class="language-lisp" data-trim>
+      ;; Efficient: foldall counts without listifying
+      (= (match-count $space $pattern)
+         (foldall + (match $space $pattern 1) 0))
+
+      ;; Less efficient: collapse lists everything
+      (= (match-list $space $pattern)
+         (collapse (match $space $pattern $x)))
+    </code></pre>
+  </section>
+  <section>
+    <h2>Naming Conventions</h2>
+    <table style="font-size: 0.6em;">
+      <tr><th>Pattern</th><th>Example</th><th>Meaning</th></tr>
+      <tr><td><code>prefix_operation</code></td><td><code>Truth_Revision</code></td><td>Group by domain</td></tr>
+      <tr><td><code>operation!</code></td><td><code>import!</code></td><td>Side effect / bang</td></tr>
+      <tr><td><code>op-type</code></td><td><code>get-type</code></td><td>Getter/accessor</td></tr>
+      <tr><td><code>op-atom</code></td><td><code>map-atom</code></td><td>Operates on list/atom</td></tr>
+      <tr><td><code>Prefix.Name</code></td><td><code>PLN.Derive</code></td><td>Namespace/qualified</td></tr>
+    </table>
+  </section>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 19: Reference Card -->
+<section>
+  <h2>Reference: Key Functions</h2>
+  <div class="cols" style="font-size: 0.55em;">
+    <div class="col">
+      <p class="highlight-pink">Registration</p>
+      <table>
+        <tr><td><code>register_fun/1</code></td><td>Mark function as callable</td></tr>
+        <tr><td><code>import_prolog_function/1</code></td><td>Register Prolog pred</td></tr>
+        <tr><td><code>import_prolog_functions_from_file/2</code></td><td>Bulk register</td></tr>
+      </table>
+      <p class="highlight-yellow" style="margin-top: 0.5em;">Import</p>
+      <table>
+        <tr><td><code>import!/2</code></td><td>Load MeTTa file into space</td></tr>
+        <tr><td><code>static-import!/2</code></td><td>Fast import via .qlf</td></tr>
+        <tr><td><code>git-import!/1..3</code></td><td>Clone repo, add to path</td></tr>
+      </table>
+    </div>
+    <div class="col">
+      <p class="highlight-green">Spaces</p>
+      <table>
+        <tr><td><code>add-atom/2</code></td><td>Assert atom</td></tr>
+        <tr><td><code>remove-atom/2</code></td><td>Retract atom</td></tr>
+        <tr><td><code>match/3</code></td><td>Pattern match</td></tr>
+        <tr><td><code>get-atoms/2</code></td><td>Enumerate atoms</td></tr>
+      </table>
+      <p class="highlight-blue" style="margin-top: 0.5em;">Translation Control</p>
+      <table>
+        <tr><td><code>call/1</code></td><td>Direct predicate call</td></tr>
+        <tr><td><code>reduce/1</code></td><td>Runtime dispatch</td></tr>
+        <tr><td><code>eval/1</code></td><td>Translate & execute</td></tr>
+        <tr><td><code>quote/1</code></td><td>Keep as data</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 20: Common Tasks Quick Reference -->
+<section>
+  <h2>Quick Reference: Common Tasks</h2>
+  <div style="font-size: 0.55em;">
+    <div class="architecture-box" style="border-color: #50fa7b; padding: 0.3em;">
+      <span class="highlight-green">Add a pure MeTTa function</span><br>
+      <code>(= (my-func $a $b) (+ $a $b))</code>
+    </div>
+    <div class="architecture-box" style="border-color: #ffb86c; padding: 0.3em;">
+      <span class="highlight-orange">Call existing Prolog from MeTTa</span><br>
+      <code>^(import_prolog_function my_pred)</code><br>
+      <code>(my_pred Arg1 Arg2)</code>
+    </div>
+    <div class="architecture-box" style="border-color: #8be9fd; padding: 0.3em;">
+      <span class="highlight-blue">Create a new Prolog-backed library</span><br>
+      <code>lib/lib_mylib.pl</code> + <code>lib/lib_mylib.metta</code>
+    </div>
+    <div class="architecture-box" style="border-color: #ff79c6; padding: 0.3em;">
+      <span class="highlight-pink">Call a Python function</span><br>
+      <code>(py-call (math.sqrt 16))</code>
+    </div>
+    <div class="architecture-box" style="border-color: #f1fa8c; padding: 0.3em;">
+      <span class="highlight-yellow">Handle errors in MeTTa</span><br>
+      <code>(catch (risky-fn $arg) ((Error $type $ctx) "Fallback"))</code>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 21: Key Prolog Predicates Reference -->
+<section>
+  <h2>Prolog Predicates You'll Use Most</h2>
+  <table style="font-size: 0.55em;">
+    <tr><th>Predicate</th><th>What it does</th></tr>
+    <tr><td><code>assertz/1</code></td><td>Add clause to database (at end)</td></tr>
+    <tr><td><code>retractall/1</code></td><td>Remove all matching clauses</td></tr>
+    <tr><td><code>nb_setval/2</code></td><td>Set global non-backtrackable var</td></tr>
+    <tr><td><code>nb_getval/2</code></td><td>Get global var</td></tr>
+    <tr><td><code>Term =.. List</code></td><td>Convert term ↔ list (univ)</td></tr>
+    <tr><td><code>call/1</code></td><td>Call a goal dynamically</td></tr>
+    <tr><td><code>!/0</code></td><td>Cut — commit to current choice</td></tr>
+    <tr><td><code>once/1</code></td><td>Call goal, keep only first solution</td></tr>
+    <tr><td><code>findall/3</code></td><td>Collect all solutions into list</td></tr>
+    <tr><td><code>forall/2</code></td><td>Universal quantification</td></tr>
+    <tr><td><code>member/2</code></td><td>Non-deterministic list member</td></tr>
+    <tr><td><code>maplist/2..3</code></td><td>Apply predicate to list elements</td></tr>
+    <tr><td><code>format/2..3</code></td><td>Formatted output</td></tr>
+    <tr><td><code>swrite/2</code></td><td>Format to string (PeTTa's)</td></tr>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<!-- SLIDE 22: Summary -->
+<section>
+  <h2>Summary</h2>
+  <div style="font-size: 0.65em;">
+    <div class="architecture-box" style="border-color: #50fa7b;">
+      <span class="highlight-green">1.</span> PeTTa compiles MeTTa <code class="highlight-yellow">→</code> Prolog for fast execution
+    </div>
+    <div class="architecture-box" style="border-color: #ffb86c;">
+      <span class="highlight-orange">2.</span> Libraries have <strong>3 layers</strong>: Pure MeTTa · Prolog · Python
+    </div>
+    <div class="architecture-box" style="border-color: #8be9fd;">
+      <span class="highlight-blue">3.</span> <code>register_fun/1</code> is the bridge between Prolog predicates and MeTTa functions
+    </div>
+    <div class="architecture-box" style="border-color: #ff79c6;">
+      <span class="highlight-pink">4.</span> The translator makes the <strong>smart dispatch</strong> decision at compile time
+    </div>
+    <div class="architecture-box" style="border-color: #f1fa8c;">
+      <span class="highlight-yellow">5.</span> Spaces are just Prolog dynamic predicates with <code>name/arity</code>
+    </div>
+  </div>
+  <p style="margin-top: 1em; font-size: 0.7em; color: #6272a4;">File: docs/library_development_guide.md</p>
+</section>
+
+</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/notes/notes.js"></script>
+<script>
+Reveal.initialize({
+  controls: true,
+  progress: true,
+  hash: true,
+  slideNumber: true,
+  center: true,
+  transition: 'convex',
+  plugins: [RevealHighlight, RevealNotes]
+});
+</script>
+</body>
+</html>
